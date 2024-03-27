@@ -24,15 +24,20 @@ class TestHipKernelFmaAsyncCopy {
             mTotalBlocks =
                 (mTotalThreads + mThreadsPerBlock - 1) / mThreadsPerBlock;
         }
-        void Test(hipStream_t stream, uint32_t deviceID) {
+        void Test(uint32_t deviceID) {
             hipSetDevice(deviceID);
+
+            cudaStream_t stream;
+            hipStreamCreate(&stream);
 
             size_t size = mTotalThreads;
             vector<float> input(size, 1.0f);  // Initialize with some value
             vector<float> output(size, 2.0f); // Initialize with some value
 
             float *a, *b;
+
             hipMalloc((void**)&a, size * sizeof(float));
+
             hipMalloc((void**)&b, size * sizeof(float));
 
             hipMemcpyAsync(a, input.data(), size * sizeof(float),
@@ -70,6 +75,7 @@ class TestHipKernelFmaAsyncCopy {
 
             hipFree(a);
             hipFree(b);
+            hipStreamDestroy(stream);
         }
 
     private:
@@ -85,16 +91,13 @@ int main() {
 
     TestHipKernelFmaAsyncCopy test(totalThreads, threadsPerBlock);
 
-    hipStream_t sharedStream;
-    hipStreamCreate(&sharedStream);
-
     omp_set_num_threads(totalGpuNum);
 
 #pragma omp parallel
     {
         auto deviceID = omp_get_thread_num();
-        test.Test(sharedStream, deviceID);
+        test.Test(deviceID);
     }
-    hipStreamDestroy(sharedStream);
+
     return 0;
 }
