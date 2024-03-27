@@ -1,3 +1,3 @@
 # omp_stream_kernel
 
-hipcc utest.cpp -o utest -fopenmp
+hipcc skt_v0.cpp -o skt0 -fopenmp
