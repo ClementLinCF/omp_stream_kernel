@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-using namespace std;
+#define STREAM_NUM 32
 
 __global__ void fmaKernel(float* input, float* output, int size) {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -24,13 +24,18 @@ class TestHipKernelFmaAsyncCopy {
             mTotalBlocks =
                 (mTotalThreads + mThreadsPerBlock - 1) / mThreadsPerBlock;
         }
-        void Test(std::vector<float>& input, std::vector<float>& output, uint32_t deviceID) {
+        void Test(uint32_t deviceID) {
             hipSetDevice(deviceID);
 
-            hipStream_t stream;
-            hipStreamCreate(&stream);
+            hipStream_t stream[STREAM_NUM];
+
+            for (size_t i = 0; i < STREAM_NUM; i++) {
+                hipStreamCreate(&stream[i]);
+            }
 
             size_t size = mTotalThreads;
+            std::vector<float> input(size, 1.0f);  // Initialize with some value
+            std::vector<float> output(size, 2.0f); // Initialize with some value
 
             float *a, *b;
 
@@ -38,19 +43,27 @@ class TestHipKernelFmaAsyncCopy {
 
             hipMalloc((void**)&b, size * sizeof(float));
 
-            hipMemcpyAsync(a, input.data(), size * sizeof(float),
-                           hipMemcpyHostToDevice, stream);
+            for (size_t i = 0; i < STREAM_NUM; i++) {
+                auto offset = i * size / STREAM_NUM;
 
-            hipLaunchKernelGGL(fmaKernel, dim3(mTotalBlocks, 1, 1),
-                               dim3(mThreadsPerBlock, 1, 1), 0, stream, a, b,
-                               size);
+                hipMemcpyAsync(a + offset, input.data() + offset,
+                               size * sizeof(float) / STREAM_NUM,
+                               hipMemcpyHostToDevice, stream[i]);
 
-            hipMemcpyAsync(output.data(), b, size * sizeof(float),
-                           hipMemcpyDeviceToHost, stream);
+                hipLaunchKernelGGL(fmaKernel, dim3(mTotalBlocks, 1, 1),
+                                   dim3(mThreadsPerBlock, 1, 1), 0, stream[i],
+                                   a + offset, b + offset, size / STREAM_NUM);
 
-            hipStreamSynchronize(stream);
+                hipMemcpyAsync(output.data() + offset, b + offset,
+                               size * sizeof(float) / STREAM_NUM,
+                               hipMemcpyDeviceToHost, stream[i]);
+            }
 
-            vector<float> cpu_output(size);
+            for (size_t i = 0; i < STREAM_NUM; i++) {
+                hipStreamSynchronize(stream[i]);
+            }
+
+            std::vector<float> cpu_output(size);
             // FMA on CPU
             for (int i = 0; i < size; i++) {
                 cpu_output[i] = input[i] * 2.0f + 1.0f;
@@ -73,7 +86,9 @@ class TestHipKernelFmaAsyncCopy {
 
             hipFree(a);
             hipFree(b);
-            hipStreamDestroy(stream);
+            for (size_t i = 0; i < STREAM_NUM; i++) {
+                hipStreamDestroy(stream[i]);
+            }
         }
 
     private:
@@ -90,15 +105,11 @@ int main() {
     TestHipKernelFmaAsyncCopy test(totalThreads, threadsPerBlock);
 
     omp_set_num_threads(totalGpuNum);
-            
-    size_t size = totalThreads;
-    vector<float> input(size, 1.0f);  // Initialize with some value
-    vector<float> output(size, 2.0f); // Initialize with some value
 
 #pragma omp parallel
     {
         auto deviceID = omp_get_thread_num();
-        test.Test(input, output, deviceID);
+        test.Test(deviceID);
     }
 
     return 0;
