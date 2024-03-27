@@ -27,7 +27,7 @@ class TestHipKernelFmaAsyncCopy {
         void Test(uint32_t deviceID) {
             hipSetDevice(deviceID);
 
-            cudaStream_t stream;
+            hipStream_t stream;
             hipStreamCreate(&stream);
 
             size_t size = mTotalThreads;
