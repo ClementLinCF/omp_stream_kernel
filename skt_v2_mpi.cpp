@@ -8,7 +8,7 @@
 #include <vector>
 
 constexpr uint64_t TOTAL_ELEMENTS = 17179869184;
-constexpr int STREAM_NUM = 32;
+constexpr int STREAM_NUM = 128;
 constexpr int THREADS_PER_PROCESS = 32;
 constexpr int GPU_NUM = 8;
 constexpr uint64_t SIZE = TOTAL_ELEMENTS / (THREADS_PER_PROCESS * GPU_NUM);
