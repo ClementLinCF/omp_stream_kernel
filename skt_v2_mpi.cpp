@@ -8,16 +8,10 @@
 #include <vector>
 
 constexpr uint64_t TOTAL_ELEMENTS = 17179869184;
-// constexpr uint64_t TOTAL_ELEMENTS = 34359738368;
-// constexpr uint64_t TOTAL_ELEMENTS = SIZE * THREADS_PER_PROCESS * GPU_NUM;
-// constexpr uint64_t TOTAL_SIZE = SIZE * THREADS_PER_PROCESS * GPU_NUM;
-// constexpr uint64_t TOTAL_SIZE = SIZE * THREADS_PER_PROCESS * GPU_NUM;
 constexpr int STREAM_NUM = 32;
 constexpr int THREADS_PER_PROCESS = 32;
 constexpr int GPU_NUM = 8;
-// constexpr uint64_t SIZE = 1024 * 1024 * 1024;
 constexpr uint64_t SIZE = TOTAL_ELEMENTS / (THREADS_PER_PROCESS * GPU_NUM);
-// constexpr uint64_t TOTAL_ELEMENTS = SIZE * THREADS_PER_PROCESS * GPU_NUM;
 
 __global__ void fmaKernel(float* input, float* output, int size) {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -36,8 +30,6 @@ class TestHipKernelFmaAsyncCopy {
                 (mTotalThreads + mThreadsPerBlock - 1) / mThreadsPerBlock;
         }
 
-        // void SetStartInput(std::vector<float>& input, int mpiRank, int
-        // threadIdx) {
         void SetStartInput(float* input, int mpiRank, int threadIdx) {
             auto chunkSize =
                 TOTAL_ELEMENTS /
@@ -45,7 +37,6 @@ class TestHipKernelFmaAsyncCopy {
                  THREADS_PER_PROCESS); // Assume GPU_NUM same as the MPI_RANKS
             auto startIdx = mpiRank * THREADS_PER_PROCESS * chunkSize +
                             threadIdx * chunkSize;
-            // mInput = input.data() + startIdx;
             mInput = input + startIdx;
         }
 
@@ -59,7 +50,6 @@ class TestHipKernelFmaAsyncCopy {
             }
 
             size_t size = mTotalThreads;
-            // std::vector<float> input(size, 1.0f);  // Initialize with some
             // value
             std::vector<float> output(size, 2.0f); // Initialize with some value
 
@@ -187,7 +177,7 @@ int main(int argc, char** argv) {
     if (0 == noderank) {
         std::cout << "TOTAL ELEMENT: " << TOTAL_ELEMENTS << std::endl;
         std::cout << "total input size (GB) = "
-                  << TOTAL_ELEMENTS * sizeof(float) / 1024 / 1024. << std::endl;
+                  << TOTAL_ELEMENTS * sizeof(float) / 1024 / 1024 / 1024. << std::endl;
         for (size_t i = 0; i < TOTAL_ELEMENTS; ++i) {
             sharedMemBuf[i] = 1.0f;
         }
